@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Лабиринт Сокровищ</title>
+  <!-- Telegram WebApp SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --accent-yellow: #f59e0b;
+      --accent-green: #10b981;
+      --accent-red: #ef4444;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      user-select: none;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 16px;
+    }
+
+    header {
+      width: 100%;
+      max-width: 400px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--card-bg);
+      padding: 12px 16px;
+      border-radius: 16px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+
+    .balance-box {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: bold;
+      font-size: 18px;
+      color: var(--accent-yellow);
+    }
+
+    .star-icon {
+      width: 22px;
+      height: 22px;
+    }
+
+    .game-container {
+      width: 100%;
+      max-width: 400px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .status-card {
+      background: var(--card-bg);
+      padding: 16px;
+      border-radius: 16px;
+      text-align: center;
+    }
+
+    .multiplier-badge {
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--accent-yellow);
+      margin-top: 4px;
+    }
+
+    .progress-bar {
+      display: flex;
+      gap: 4px;
+      overflow-x: auto;
+      padding: 8px 0;
+    }
+
+    .progress-step {
+      flex: 1;
+      min-width: 45px;
+      background: #334155;
+      padding: 6px 2px;
+      border-radius: 8px;
+      font-size: 11px;
+      text-align: center;
+      color: var(--text-muted);
+      border: 1px solid transparent;
+    }
+
+    .progress-step.active {
+      background: #b45309;
+      color: #fff;
+      border-color: var(--accent-yellow);
+      font-weight: bold;
+    }
+
+    .chests-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin: 10px 0;
+    }
+
+    .chest-btn {
+      background: var(--card-bg);
+      border: 2px solid #334155;
+      border-radius: 16px;
+      height: 110px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 40px;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .chest-btn:active:not(:disabled) {
+      transform: scale(0.95);
+    }
+
+    .chest-btn:disabled {
+      cursor: default;
+      opacity: 0.8;
+    }
+
+    .chest-btn.success {
+      border-color: var(--accent-green);
+      background: rgba(16, 185, 129, 0.1);
+    }
+
+    .chest-btn.trap {
+      border-color: var(--accent-red);
+      background: rgba(239, 68, 68, 0.1);
+      animation: shake 0.4s ease-in-out;
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-6px); }
+      40%, 80% { transform: translateX(6px); }
+    }
+
+    .controls {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .bet-selector {
+      display: flex;
+      gap: 8px;
+    }
+
+    .bet-btn {
+      flex: 1;
+      background: var(--card-bg);
+      border: 1px solid #334155;
+      color: var(--text-main);
+      padding: 10px;
+      border-radius: 10px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .bet-btn.active {
+      border-color: var(--accent-yellow);
+      color: var(--accent-yellow);
+    }
+
+    .main-btn {
+      width: 100%;
+      padding: 16px;
+      border: none;
+      border-radius: 14px;
+      font-size: 18px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-start {
+      background: var(--accent-yellow);
+      color: #000;
+    }
+
+    .btn-cashout {
+      background: var(--accent-green);
+      color: #fff;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div>⭐️ <b>Лабиринт</b></div>
+    <div class="balance-box">
+      <span id="balance">100</span> ⭐️
+    </div>
+  </header>
+
+  <div class="game-container">
+    <div class="status-card">
+      <div id="status-title" style="color: var(--text-muted); font-size: 14px;">Выберете ставку и начните игру</div>
+      <div id="multiplier" class="multiplier-badge">x1.00</div>
+    </div>
+
+    <!-- Прогресс коэффициентов -->
+    <div id="progress" class="progress-bar"></div>
+
+    <!-- 3 сундука -->
+    <div class="chests-grid">
+      <button class="chest-btn" onclick="openChest(0)" disabled>📦</button>
+      <button class="chest-btn" onclick="openChest(1)" disabled>📦</button>
+      <button class="chest-btn" onclick="openChest(2)" disabled>📦</button>
+    </div>
+
+    <div class="controls">
+      <!-- Выбор ставки -->
+      <div id="bet-controls" class="bet-selector">
+        <button class="bet-btn active" onclick="setBet(10)">10 ⭐️</button>
+        <button class="bet-btn" onclick="setBet(25)">25 ⭐️</button>
+        <button class="bet-btn" onclick="setBet(50)">50 ⭐️</button>
+        <button class="bet-btn" onclick="setBet(100)">100 ⭐️</button>
+      </div>
+
+      <!-- Кнопка старта / забрания выигрыша -->
+      <button id="action-btn" class="main-btn btn-start" onclick="startGame()">Начать за 10 ⭐️</button>
+    </div>
+  </div>
+
+  <script>
+    const tg = window.Telegram.WebApp;
+    tg.expand(); // Разворачиваем Mini App на весь экран
+
+    // Замените этот URL на адрес вашего deployed backend сервера
+    const BACKEND_URL = "https://your-backend-domain.com";
+
+    const MULTIPLIERS = [1.30, 1.80, 2.50, 3.50, 5.00, 7.50, 11.00, 16.00, 25.00, 40.00];
+    let currentBet = 10;
+    let balance = 100;
+    let gameId = null;
+    let currentStep = 0;
+    let isGameActive = false;
+
+    // Звуковой движок (Web Audio API)
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playSound(freq, duration) {
+      try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.frequency.value = freq;
+        osc.start();
+        gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + duration);
+        osc.stop(audioCtx.currentTime + duration);
+      } catch (e) {}
+    }
+
+    function renderProgress() {
+      const container = document.getElementById('progress');
+      container.innerHTML = '';
+      MULTIPLIERS.forEach((m, idx) => {
+        const step = document.createElement('div');
+        step.className = `progress-step ${idx === currentStep && isGameActive ? 'active' : ''}`;
+        step.innerText = `${m}x`;
+        container.appendChild(step);
+      });
+    }
+
+    function setBet(amount) {
+      if (isGameActive) return;
+      currentBet = amount;
+      document.querySelectorAll('.bet-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.innerText.includes(amount));
+      });
+      document.getElementById('action-btn').innerText = `Начать за ${currentBet} ⭐️`;
+    }
+
+    async function startGame() {
+      if (isGameActive) {
+        cashout();
+        return;
+      }
+
+      const userId = tg.initDataUnsafe?.user?.id || 12345;
+
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/game/start`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ userId, betAmount: currentBet })
+        });
+        const data = await res.json();
+
+        if (!data.success) {
+          alert(data.message || 'Недостаточно средств!');
+          return;
+        }
+
+        gameId = data.gameId;
+        balance = data.newBalance;
+        document.getElementById('balance').innerText = balance;
+       
+        isGameActive = true;
+        currentStep = 0;
+       
+        resetChests(true);
+        updateUI();
+        playSound(440, 0.2);
+      } catch (e) {
+        console.error(e);
+        alert('Ошибка подключения к серверу');
+      }
+    }
+
+    async function openChest(index) {
+      if (!isGameActive) return;
+
+      const chestBtns = document.querySelectorAll('.chest-btn');
+      chestBtns.forEach(btn => btn.disabled = true);
+
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/game/open-chest`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ gameId, chosenChest: index })
+        });
+        const data = await res.json();
+
+        if (data.isTrap) {
+          // Выпала ловушка
+          chestBtns[index].classList.add('trap');
+          chestBtns[index].innerText = '💣';
+          playSound(150, 0.5);
+         
+          isGameActive = false;
+          document.getElementById('status-title').innerText = 'О нет! Вы попали в ловушку!';
+          document.getElementById('action-btn').className = 'main-btn btn-start';
+          document.getElementById('action-btn').innerText = `Сыграть снова (${currentBet} ⭐️)`;
+        } else {
+          // Сокровище
+          chestBtns[index].classList.add('success');
+          chestBtns[index].innerText = '💎';
+          playSound(600, 0.3);
+
+          currentStep = data.nextStep;
+          if (currentStep >= MULTIPLIERS.length) {
+            // Прошли все 10 шагов
+            cashout();
+          } else {
+            document.getElementById('status-title').innerText = `Заберите выигрыш или идите дальше!`;
+            document.getElementById('multiplier').innerText = `${MULTIPLIERS[currentStep - 1]}x (${Math.floor(currentBet * MULTIPLIERS[currentStep - 1])} ⭐️)`;
+           
+            setTimeout(() => {
+              resetChests(true);
+            }, 600);
+          }
+        }
+        renderProgress();
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function cashout() {
+      if (!isGameActive) return;
+
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/game/cashout`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ gameId })
+        });
+        const data = await res.json();
+
+        balance = data.newBalance;
+        document.getElementById('balance').innerText = balance;
+        isGameActive = false;
+
+        playSound(880, 0.4);
+        alert(`🎉 Поздравляем! Вы забрали ${data.totalWin} ⭐️!`);
+
+        resetChests(false);
+        updateUI();
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function resetChests(enable) {
+      const chestBtns = document.querySelectorAll('.chest-btn');
+      chestBtns.forEach(btn => {
+        btn.className = 'chest-btn';
+        btn.innerText = '📦';
+        btn.disabled = !enable;
+      });
+    }
+
+    function updateUI() {
+      const actionBtn = document.getElementById('action-btn');
+      if (isGameActive) {
+        actionBtn.className = 'main-btn btn-cashout';
+        const winAmount = Math.floor(currentBet * (MULTIPLIERS[currentStep - 1] || 1));
+        actionBtn.innerText = `Забрать ${winAmount} ⭐️`;
+        document.getElementById('status-title').innerText = 'Выберите 1 из 3 сундуков:';
+      } else {
+        actionBtn.className = 'main-btn btn-start';
+        actionBtn.innerText = `Начать за ${currentBet} ⭐️`;
+        document.getElementById('status-title').innerText = 'Выберете ставку и начните игру';
+        document.getElementById('multiplier').innerText = 'x1.00';
+      }
+      renderProgress();
+    }
+
+    renderProgress();
+  </script>
+</body>
+</html>
